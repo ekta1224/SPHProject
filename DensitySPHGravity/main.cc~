@@ -1,0 +1,222 @@
+/*
+Time-stamp: <main.cc on Thursday, 9 April, 2015 at 10:37:08 MST (pinto)>
+
+  Density and SPH gravity demonstration
+
+  g++ -O3 -Ilib -std=c++11 -fopenmp main.cc
+
+  Note: for more than about 16K particles, you make need to set your shell's stacksize
+        to a larger value with:
+            ulimit -s unlimited
+
+ */
+
+#define KERNEL QuinticSpline
+
+//#include <omp.h>
+#include <cassert>
+#include <cstdlib>
+#include <cstring>
+
+#include "pprint.cc"
+#include "STimer.cc"
+
+#include "smallvec.cc"
+typedef SmallVec<double, 3> dvec;
+
+#include "util.cc"
+
+#include "particleset.cc"
+#include "getparticleshalogen.cc"
+
+#include "mykern.cc"
+#include "minheap.cc"
+#include "octree.cc"
+#include "sphdensity.cc"
+#include "density.cc"
+
+double ap(double r) {
+    return r*pow(1+r*r,-1.5);
+}
+
+double plummerRho(double r) {
+    double a = 1.0;
+    return 3.0/(4*M_PI*a*a*a) * pow(1.0 + r*r/(a*a), -2.5);
+}
+
+template<int D>
+double geteta(int Ndesired) {
+    double eta = pow( (double)Ndesired/(4.0*M_PI/3.0), 1.0/((double)D) );
+    return eta;
+}
+
+int main(int argc, char **argv) {
+    if(argc !=2 ) {
+        fpprint(std::cerr,"usage: %s <model file>\n", argv[0]);
+        exit(1);
+    }
+
+    // timer functions
+    STimer timeit;
+
+    // parameters
+    const int D = 3;
+    int Nneighbours = 400;
+    int maxleafsize = 64;
+    int knn = Nneighbours*3;
+    int nprocs = omp_get_num_procs();
+
+    double eta = geteta<D>(Nneighbours); fpprint(std::cerr,"eta = %e\n", eta);
+
+    // get problem data
+    dvec center;
+    double halfwidth;
+    Particleset<3> p;
+    getParticlesHalogen(argv[1], p, center, halfwidth);
+
+    // build the octree
+    timeit.CStart();
+    Octree<D> tree(nprocs);
+    tree.buildTree(center, halfwidth, p, maxleafsize);
+    timeit.Stop();
+    fpprint(std::cerr,"time to build tree: %e  rate: %e\n", timeit.Elapsed(), (double)p.np/timeit.Elapsed());
+    tree.checkTree();
+    fpprint(std::cerr,"nnodes: %d   nleaves: %d\n", tree.n_nodes, tree.n_leafSet);
+
+    // get density with no previous knowledge of smoothing lengths
+    timeit.CStart();
+    getDensity1st(p, tree, Nneighbours, eta);
+    timeit.Stop(); timeit.Report("density 1st time: ");
+#if 0
+    // get density with previous "estimate"
+    timeit.CStart();
+    getDensity(p, tree, Nneighbours, eta);
+    timeit.Stop(); timeit.Report("density 2nd time: ");
+#endif
+
+    // get exact acceleration by applying SPH gravity kernel using N^2
+    KERNEL<D> K;
+
+    fpprint(std::cerr, "got 1\n");
+#pragma omp parallel for schedule(dynamic, 1)
+    for(int i=0; i<p.np; i++) {
+        p[i].acc0.zero();
+        p[i].pot0 = 0;
+        double Potij;
+        dvec Fij;
+        for(int j=0; j<p.np; j++) {
+            if(i!=j) {
+                dvec dr = p[i].r - p[j].r;
+                double r = dr.norm();
+                Fij = p[j].m * 0.5*(K.forcekernel(r, p[i].h) + K.forcekernel(r, p[j].h)) * dr/r;
+                Potij = p[j].m * 0.5*(K.phikernel(r, p[i].h) + K.phikernel(r, p[j].h));
+                p[i].acc0 += Fij;
+                p[i].pot0 += Potij;
+            }
+        }
+    }
+
+    fpprint(std::cerr, "got 2\n");
+    // zero out accelerations in which to accumulate
+    for(int i=0; i<p.np; i++) {
+        p[i].acc.zero();
+        p[i].pot = 0;
+    }
+
+    fpprint(std::cerr, "got 3\n");
+    // do all on all with "Newtonian" gravity and no smoothing
+#pragma omp parallel for schedule(dynamic, 1)
+    for(int i=0; i<p.np; i++) {
+        for(int j=0; j<p.np; j++) {
+            if(i!=j) {
+                dvec dr = p[i].r - p[j].r;
+                double r = dr.norm();
+                dvec Fij =  p[j].m * dr/(r*r*r);
+                double Potij = - p[j].m / r;
+                p[i].acc += Fij;
+                p[i].pot += Potij;
+            }
+        }
+    }
+
+    fpprint(std::cerr, "got 4\n");
+    // replace Newtonian with SPH gravity for the neighbours of each particle
+    dvec tmpjacc[nprocs][p.np];
+    double tmpjpot[nprocs][p.np];
+
+    for(int g=0; g<nprocs; g++) {
+        for(int i=0; i<p.np; i++) {
+            tmpjacc[g][i].zero();
+            tmpjpot[g][i] = 0;
+        }
+    }
+
+    fpprint(std::cerr, "got 5\n");
+    int srcids[nprocs][p.np];
+#pragma omp parallel for schedule(dynamic, 1)
+    for(int i=0; i<p.np; i++) {
+        int g = omp_get_thread_num();
+
+        // find the neighbouring particles to work on
+        int nsrcids = 0;
+        tree.ballSearch(p[i].r, p[i].h, srcids[g], nsrcids);
+        assert( nsrcids > 0 );
+
+        // replace Newtonian with SPH gravity
+        for(int k=0; k<nsrcids; k++) {
+            int j = srcids[g][k];
+            if(i!=j) {
+                dvec dr = p[i].r - p[j].r;
+                double r = dr.norm();
+                if( r < p[i].h ) {
+                    dvec a = 0.5 * K.forcekernel(r, p[i].h) * dr/r;
+                    double b = 0.5 * K.phikernel(r, p[i].h);
+                    dvec zippo = dr/(r*r*r);
+
+                    p[i].acc += p[j].m * ( a - 0.5 * zippo );
+                    p[i].pot += p[j].m * ( b + 0.5/r );
+                    tmpjacc[g][j] -= p[i].m * ( a - 0.5 * zippo );
+                    tmpjpot[g][j] += p[i].m * ( b + 0.5/r );
+                }
+            }
+        }
+    }
+
+    fpprint(std::cerr, "got 6\n");
+    // complete the reduction operation
+    for(int g=0; g<nprocs; g++) {
+        for(int i=0; i<p.np; i++) {
+            p[i].acc += tmpjacc[g][i];
+            p[i].pot += tmpjpot[g][i];
+        }
+    }
+
+    // check that we get the same answer -- the agreement should be exact since
+    // there is no tree involved
+    for(int i=0; i<p.np; i++) {
+        assert( CLOSE(p[i].acc, p[i].acc0, 1e-10) );
+        assert( CLOSE(p[i].pot, p[i].pot0, 1e-10) );
+    }
+
+    // output data to file for plotting with george.m
+    for(int i=0; i<p.np; i++) {
+        pprint("%4d  %e    %e  %d   %e   %e  %e\n", i, p[i].r.norm(), p[i].rho, p[i].nn, p[i].acc.norm(), p[i].pot, p[i].h);
+    }
+
+    // compute the maximum norm of the analytic force over particles
+    double fmax = 0;
+    for(int i=0; i<p.np; i++) {
+        double f = ap(p[i].r.norm());
+        if(f>fmax) fmax = f;
+    }
+
+    // compute Mean Average Square Error from the exact plummer acceleration
+    double mase = 0;
+    for(int i=0; i<p.np; i++) {
+        double q = p[i].acc.norm() - ap(p[i].r.norm());
+        mase += q*q;
+    }
+    mase *= (1.0/(fmax*fmax))/(double)p.np;
+
+    fpprint(std::cerr, "mase = %e\n", mase);
+}

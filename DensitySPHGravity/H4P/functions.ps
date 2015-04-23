@@ -1,0 +1,1695 @@
+%!PS-Adobe-3.0
+%%Title: functions.c
+%%For: drdre
+%%Creator: a2ps version 4.14
+%%CreationDate: Fri Nov 13 09:48:53 2009
+%%BoundingBox: 24 24 588 768
+%%DocumentData: Clean7Bit
+%%Orientation: Landscape
+%%Pages: 4
+%%PageOrder: Ascend
+%%DocumentMedia: Letter 612 792 0 () ()
+%%DocumentNeededResources: font Courier
+%%+ font Courier-Bold
+%%+ font Courier-BoldOblique
+%%+ font Courier-Oblique
+%%+ font Helvetica
+%%+ font Helvetica-Bold
+%%+ font Symbol
+%%+ font Times-Bold
+%%+ font Times-Roman
+%%DocumentProcessColors: Black 
+%%DocumentSuppliedResources: procset a2ps-a2ps-hdr
+%%+ procset a2ps-black+white-Prolog
+%%+ encoding ISO-8859-1Encoding
+%%EndComments
+/a2psdict 200 dict def
+a2psdict begin
+%%BeginProlog
+%%Copyright: (c) 1988, 89, 90, 91, 92, 93 Miguel Santana
+%%Copyright: (c) 1995, 96, 97, 98 Akim Demaille, Miguel Santana
+% Check PostScript language level.
+/languagelevel where {
+  pop /gs_languagelevel languagelevel def
+} {
+  /gs_languagelevel 1 def
+} ifelse
+
+% EPSF import as in the Red Book
+/BeginInclude {
+  /b4_Inc_state save def    		% Save state for cleanup
+  /dict_count countdictstack def	% Count objects on dict stack
+  /op_count count 1 sub def		% Count objects on operand stack 
+  userdict begin
+    0 setgray 0 setlinecap
+    1 setlinewidth 0 setlinejoin
+    10 setmiterlimit [ ] 0 setdash newpath
+    gs_languagelevel 1 ne {
+      false setstrokeadjust false setoverprint 
+    } if
+} bind def
+
+/EndInclude {
+  count op_count sub { pos } repeat	% Clean up stacks
+  countdictstack dict_count sub { end } repeat
+  b4_Inc_state restore
+} bind def
+
+/BeginEPSF {
+  BeginInclude
+  /showpage { } def
+} bind def
+
+/EndEPSF {
+  EndInclude
+} bind def
+
+% Page prefeed
+/page_prefeed {         % bool -> -
+  statusdict /prefeed known {
+    statusdict exch /prefeed exch put
+  } {
+    pop
+  } ifelse
+} bind def
+
+/deffont {
+  findfont exch scalefont def
+} bind def
+
+/reencode_font {
+  findfont reencode 2 copy definefont pop def
+} bind def
+
+% Function c-show (str => -)
+% centers text only according to x axis.
+/c-show { 
+  dup stringwidth pop
+  2 div neg 0 rmoveto
+  show
+} bind def
+
+% Function l-show (str => -)
+% prints texts so that it ends at currentpoint
+/l-show {
+  dup stringwidth pop neg 
+  0 
+  rmoveto show
+} bind def
+
+% center-fit show (str w => -)
+% show centered, and scale currentfont so that the width is less than w
+/cfshow {
+  exch dup stringwidth pop
+  % If the title is too big, try to make it smaller
+  3 2 roll 2 copy
+  gt
+  { % if, i.e. too big
+    exch div
+    currentfont exch scalefont setfont
+  } { % ifelse
+    pop pop 
+  }
+  ifelse
+  c-show			% center title
+} bind def
+
+% Return the y size of the current font
+% - => fontsize
+/currentfontsize {
+  currentfont /FontType get 0 eq {
+    currentfont /FontMatrix get 3 get
+  }{
+    currentfont /FontMatrix get 3 get 1000 mul
+  } ifelse
+} bind def
+
+% reencode the font
+% <encoding-vector> <fontdict> -> <newfontdict>
+/reencode { %def
+  dup length 5 add dict begin
+    { %forall
+      % <vector> <key> <val>
+      1 index /FID ne 
+      { def }{ pop pop } ifelse
+    } forall
+    /Encoding exch def % -
+
+    % Use the font's bounding box to determine the ascent, descent,
+    % and overall height; don't forget that these values have to be
+    % transformed using the font's matrix.
+    % We use `load' because sometimes BBox is executable, sometimes not.
+    % Since we need 4 numbers an not an array avoid BBox from being executed
+    /FontBBox load aload pop
+    FontMatrix transform /Ascent exch def pop
+    FontMatrix transform /Descent exch def pop
+    /FontHeight Ascent Descent sub def
+
+    % Get the underline position and thickness if they're defined.
+    % Use 1 if they are not defined.
+    currentdict /FontInfo 2 copy known
+    { get
+      /UnderlinePosition 2 copy % <FontInfo> /UP <FontInfo> /UP
+      2 copy known
+      { get }{ pop pop 1 } ifelse
+      0 exch FontMatrix transform exch pop
+      def % <FontInfo>
+
+      /UnderlineThickness 2 copy % <FontInfo> /UT <FontInfo> /UT
+      2 copy known
+      { get }{ pop pop 1 } ifelse
+      0 exch FontMatrix transform exch pop
+      def % <FontInfo>
+      pop % -
+    }{ pop pop
+    } ifelse
+
+    currentdict
+  end 
+} bind def
+
+% composite fonts for ASCII-EUC mixed strings
+% Version 1.2 1/31/1990
+% Original Ken'ichi HANDA (handa@etl.go.jp)
+% Modified Norio Katayama (katayama@rd.nacsis.ac.jp),1998
+% Extend & Fix Koji Nakamaru (maru@on.cs.keio.ac.jp), 1999
+% Anyone can freely copy, modify, distribute this program.
+
+/copyfont {	% font-dic extra-entry-count  copyfont  font-dic
+	1 index maxlength add dict begin
+	{	1 index /FID ne 2 index /UniqueID ne and
+		{def} {pop pop} ifelse
+	} forall
+	currentdict
+	end
+} bind def
+
+/compositefont { % ASCIIFontName EUCFontName RomanScale RomanOffset Rot(T/F) compositefont font
+    /RomanRotation exch def
+    /RomanOffset exch def
+    /RomanScale exch def
+    userdict /fixeucfont_dict known not {
+	userdict begin
+	    /fixeucfont_dict 2 dict begin
+		/UpperByteEncoding [
+		    16#00 1 16#20 { pop 0 } for
+		    16#21 1 16#28 { 16#20 sub } for
+		    16#29 1 16#2F { pop 0 } for
+		    16#30 1 16#74 { 16#27 sub } for
+		    16#75 1 16#FF { pop 0 } for
+		] def
+	        /LowerByteEncoding [
+		    16#00 1 16#A0 { pop /.notdef } for
+		    16#A1 1 16#FE { 16#80 sub 16 2 string cvrs
+				    (cXX) dup 1 4 -1 roll
+				    putinterval cvn } for
+		    /.notdef
+		] def
+		currentdict
+	    end def
+	end
+    } if
+    findfont dup /FontType get 0 eq {
+	14 dict begin
+	    %
+	    % 7+8 bit EUC font
+	    %
+	    12 dict begin
+		/EUCFont exch def
+		/FontInfo (7+8 bit EUC font) readonly def
+		/PaintType 0 def
+		/FontType 0 def
+		/FontMatrix matrix def
+		% /FontName
+		/Encoding fixeucfont_dict /UpperByteEncoding get def
+		/FMapType 2 def
+		EUCFont /WMode known
+		{ EUCFont /WMode get /WMode exch def }
+		{ /WMode 0 def } ifelse
+		/FDepVector [
+		    EUCFont /FDepVector get 0 get
+		    [ 16#21 1 16#28 {} for 16#30 1 16#74 {} for ]
+		    {
+			13 dict begin
+			    /EUCFont EUCFont def
+			    /UpperByte exch 16#80 add def	
+			    % /FontName
+			    /FontInfo (EUC lower byte font) readonly def
+			    /PaintType 0 def
+			    /FontType 3 def
+			    /FontMatrix matrix def
+			    /FontBBox {0 0 0 0} def
+			    /Encoding
+				fixeucfont_dict /LowerByteEncoding get def
+			    % /UniqueID
+			    % /WMode
+			    /BuildChar {
+				gsave
+				exch dup /EUCFont get setfont
+				/UpperByte get
+				2 string
+				dup 0 4 -1 roll put
+				dup 1 4 -1 roll put
+				dup stringwidth setcharwidth
+				0 0 moveto show
+				grestore
+			    } bind def
+			    currentdict
+			end
+			/lowerbytefont exch definefont
+		    } forall
+		] def
+		currentdict
+	    end
+	    /eucfont exch definefont
+	    exch
+	    findfont 1 copyfont dup begin
+		RomanRotation {
+			/FontMatrix FontMatrix
+			[ 0 RomanScale neg RomanScale 0 RomanOffset neg 0 ]
+			matrix concatmatrix def
+		}{
+			/FontMatrix FontMatrix
+			[ RomanScale 0 0 RomanScale 0 RomanOffset ] matrix concatmatrix
+			def
+			/CDevProc
+			    {pop pop pop pop 0 exch -1000 exch 2 div 880} def
+		} ifelse
+	    end
+	    /asciifont exch definefont
+	    exch
+	    /FDepVector [ 4 2 roll ] def
+	    /FontType 0 def
+	    /WMode 0 def
+	    /FMapType 4 def
+	    /FontMatrix matrix def
+	    /Encoding [0 1] def
+	    /FontBBox {0 0 0 0} def
+%	    /FontHeight 1.0 def % XXXX
+	    /FontHeight RomanScale 1.0 ge { RomanScale }{ 1.0 } ifelse def
+	    /Descent -0.3 def   % XXXX
+	    currentdict
+	end
+	/tmpfont exch definefont
+	pop
+	/tmpfont findfont
+    }{
+	pop findfont 0 copyfont
+    } ifelse
+} def	
+
+/slantfont {	% FontName slant-degree  slantfont  font'
+    exch findfont 1 copyfont begin
+    [ 1 0 4 -1 roll 1 0 0 ] FontMatrix exch matrix concatmatrix
+    /FontMatrix exch def
+    currentdict
+    end
+} def
+
+% Function print line number (<string> # -)
+/# {
+  gsave
+    sx cw mul neg 2 div 0 rmoveto
+    f# setfont
+    c-show
+  grestore
+} bind def
+
+% -------- Some routines to enlight plain b/w printings ---------
+
+% Underline
+% width --
+/dounderline {
+  currentpoint
+  gsave
+    moveto
+    0 currentfont /Descent get currentfontsize mul rmoveto
+    0 rlineto
+    stroke
+  grestore
+} bind def
+
+% Underline a string
+% string --
+/dounderlinestring {
+  stringwidth pop
+  dounderline
+} bind def
+
+/UL {
+  /ul exch store
+} bind def
+
+% Draw a box of WIDTH wrt current font
+% width --
+/dobox {
+  currentpoint
+  gsave
+    newpath
+    moveto
+    0 currentfont /Descent get currentfontsize mul rmoveto
+    dup 0 rlineto
+    0 currentfont /FontHeight get currentfontsize mul rlineto
+    neg 0 rlineto
+    closepath
+    stroke
+  grestore
+} bind def
+
+/BX {
+  /bx exch store
+} bind def
+
+% Box a string
+% string --
+/doboxstring {
+  stringwidth pop
+  dobox
+} bind def
+
+%
+% ------------- Color routines ---------------
+%
+/FG /setrgbcolor load def
+
+% Draw the background
+% width --
+/dobackground {
+  currentpoint
+  gsave
+    newpath
+    moveto
+    0 currentfont /Descent get currentfontsize mul rmoveto
+    dup 0 rlineto
+    0 currentfont /FontHeight get currentfontsize mul rlineto
+    neg 0 rlineto
+    closepath
+    bgcolor aload pop setrgbcolor
+    fill
+  grestore
+} bind def
+
+% Draw bg for a string
+% string --
+/dobackgroundstring {
+  stringwidth pop
+  dobackground
+} bind def
+
+
+/BG {
+  dup /bg exch store
+  { mark 4 1 roll ] /bgcolor exch store } if
+} bind def
+
+
+/Show {
+  bg { dup dobackgroundstring } if
+  ul { dup dounderlinestring } if
+  bx { dup doboxstring } if
+  show
+} bind def
+
+% Function T(ab), jumps to the n-th tabulation in the current line
+/T {
+  cw mul x0 add
+  bg { dup currentpoint pop sub dobackground } if
+  ul { dup currentpoint pop sub dounderline } if
+  bx { dup currentpoint pop sub dobox } if
+  y0 moveto
+} bind def
+
+% Function n: move to the next line
+/n {
+  /y0 y0 bfs sub store
+  x0 y0 moveto
+} bind def
+
+% Function N: show and move to the next line
+/N {
+  Show
+  /y0 y0 bfs sub store
+  x0 y0 moveto
+} bind def
+
+/S {
+  Show
+} bind def
+
+%%BeginResource: procset a2ps-a2ps-hdr 2.0 2
+%%Copyright: (c) 1988, 89, 90, 91, 92, 93 Miguel Santana
+%%Copyright: (c) 1995, 96, 97, 98 Akim Demaille, Miguel Santana
+% Function title: prints page header.
+% <ct> <rt> <lt> are passed as argument
+/title { 
+  % 1. Draw the background
+  x v get y v get moveto
+  gsave
+    0 th 2 div neg rmoveto 
+    th setlinewidth
+    0.95 setgray
+    pw 0 rlineto stroke
+  grestore
+  % 2. Border it
+  gsave
+    0.7 setlinewidth
+    pw 0 rlineto
+    0 th neg rlineto
+    pw neg 0 rlineto
+    closepath stroke
+  grestore
+  % stk: ct rt lt
+  x v get y v get th sub 1 add moveto
+%%IncludeResource: font Helvetica
+  fHelvetica fnfs 0.8 mul scalefont setfont
+  % 3. The left title
+  gsave
+    dup stringwidth pop fnfs 0.8 mul add exch % leave space took on stack
+    fnfs 0.8 mul hm rmoveto
+    show			% left title
+  grestore
+  exch
+  % stk: ct ltw rt
+  % 4. the right title
+  gsave
+    dup stringwidth pop fnfs 0.8 mul add exch % leave space took on stack
+    dup
+    pw exch stringwidth pop fnfs 0.8 mul add sub
+    hm
+    rmoveto
+    show			% right title
+  grestore
+  % stk: ct ltw rtw
+  % 5. the center title
+  gsave
+    pw 3 1 roll
+    % stk: ct pw ltw rtw
+    3 copy 
+    % Move to the center of the left room
+    sub add 2 div hm rmoveto
+    % What is the available space in here?
+    add sub fnfs 0.8 mul sub fnfs 0.8 mul sub
+    % stk: ct space_left
+%%IncludeResource: font Helvetica-Bold
+  fHelvetica-Bold fnfs scalefont setfont
+    cfshow
+  grestore
+} bind def
+
+% Function border: prints virtual page border
+/border { %def
+  gsave				% print four sides
+    0 setgray
+    x v get y v get moveto
+    0.7 setlinewidth		% of the square
+    pw 0 rlineto
+    0 ph neg rlineto
+    pw neg 0 rlineto
+    closepath stroke
+  grestore
+} bind def
+
+% Function water: prints a water mark in background
+/water { %def
+  gsave
+    scx scy moveto rotate
+%%IncludeResource: font Times-Bold
+  fTimes-Bold 100 scalefont setfont
+    .97 setgray
+    dup stringwidth pop 2 div neg -50 rmoveto
+    show
+  grestore
+} bind def
+
+% Function rhead: prints the right header
+/rhead {  %def
+  lx ly moveto
+  fHelvetica fnfs 0.8 mul scalefont setfont
+  l-show
+} bind def
+
+% Function footer (cf rf lf -> -)
+/footer {
+  fHelvetica fnfs 0.8 mul scalefont setfont
+  dx dy moveto
+  show
+
+  snx sny moveto
+  l-show
+  
+  fnx fny moveto
+  c-show
+} bind def
+%%EndResource
+%%BeginResource: procset a2ps-black+white-Prolog 2.0 1
+
+% Function T(ab), jumps to the n-th tabulation in the current line
+/T { 
+  cw mul x0 add y0 moveto
+} bind def
+
+% Function n: move to the next line
+/n { %def
+  /y0 y0 bfs sub store
+  x0 y0 moveto
+} bind def
+
+% Function N: show and move to the next line
+/N {
+  Show
+  /y0 y0 bfs sub store
+  x0 y0 moveto
+}  bind def
+
+/S {
+  Show
+} bind def
+
+/p {
+  false UL
+  false BX
+  fCourier bfs scalefont setfont
+  Show
+} bind def
+
+/sy {
+  false UL
+  false BX
+  fSymbol bfs scalefont setfont
+  Show
+} bind def
+
+/k {
+  false UL
+  false BX
+  fCourier-Oblique bfs scalefont setfont
+  Show
+} bind def
+
+/K {
+  false UL
+  false BX
+  fCourier-Bold bfs scalefont setfont
+  Show
+} bind def
+
+/c {
+  false UL
+  false BX
+  fCourier-Oblique bfs scalefont setfont
+  Show
+} bind def
+
+/C {
+  false UL
+  false BX
+  fCourier-BoldOblique bfs scalefont setfont
+  Show 
+} bind def
+
+/l {
+  false UL
+  false BX
+  fHelvetica bfs scalefont setfont
+  Show
+} bind def
+
+/L {
+  false UL
+  false BX
+  fHelvetica-Bold bfs scalefont setfont
+  Show 
+} bind def
+
+/str{
+  false UL
+  false BX
+  fTimes-Roman bfs scalefont setfont
+  Show
+} bind def
+
+/e{
+  false UL
+  true BX
+  fHelvetica-Bold bfs scalefont setfont
+  Show
+} bind def
+
+%%EndResource
+%%EndProlog
+%%BeginSetup
+%%IncludeResource: font Courier
+%%IncludeResource: font Courier-Oblique
+%%IncludeResource: font Courier-Bold
+%%IncludeResource: font Times-Roman
+%%IncludeResource: font Symbol
+%%IncludeResource: font Courier-BoldOblique
+%%BeginResource: encoding ISO-8859-1Encoding
+/ISO-8859-1Encoding [
+/.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef 
+/.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef 
+/.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef 
+/.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef 
+/space /exclam /quotedbl /numbersign /dollar /percent /ampersand /quoteright 
+/parenleft /parenright /asterisk /plus /comma /minus /period /slash 
+/zero /one /two /three /four /five /six /seven 
+/eight /nine /colon /semicolon /less /equal /greater /question 
+/at /A /B /C /D /E /F /G 
+/H /I /J /K /L /M /N /O 
+/P /Q /R /S /T /U /V /W 
+/X /Y /Z /bracketleft /backslash /bracketright /asciicircum /underscore 
+/quoteleft /a /b /c /d /e /f /g 
+/h /i /j /k /l /m /n /o 
+/p /q /r /s /t /u /v /w 
+/x /y /z /braceleft /bar /braceright /asciitilde /.notdef 
+/.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef 
+/.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef 
+/.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef 
+/.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef 
+/space /exclamdown /cent /sterling /currency /yen /brokenbar /section 
+/dieresis /copyright /ordfeminine /guillemotleft /logicalnot /hyphen /registered /macron 
+/degree /plusminus /twosuperior /threesuperior /acute /mu /paragraph /bullet 
+/cedilla /onesuperior /ordmasculine /guillemotright /onequarter /onehalf /threequarters /questiondown 
+/Agrave /Aacute /Acircumflex /Atilde /Adieresis /Aring /AE /Ccedilla 
+/Egrave /Eacute /Ecircumflex /Edieresis /Igrave /Iacute /Icircumflex /Idieresis 
+/Eth /Ntilde /Ograve /Oacute /Ocircumflex /Otilde /Odieresis /multiply 
+/Oslash /Ugrave /Uacute /Ucircumflex /Udieresis /Yacute /Thorn /germandbls 
+/agrave /aacute /acircumflex /atilde /adieresis /aring /ae /ccedilla 
+/egrave /eacute /ecircumflex /edieresis /igrave /iacute /icircumflex /idieresis 
+/eth /ntilde /ograve /oacute /ocircumflex /otilde /odieresis /divide 
+/oslash /ugrave /uacute /ucircumflex /udieresis /yacute /thorn /ydieresis 
+] def
+%%EndResource
+% Initialize page description variables.
+/sh 612 def
+/sw 792 def
+/llx 24 def
+/urx 768 def
+/ury 588 def
+/lly 24 def
+/#copies 1 def
+/th 15.000000 def
+/fnfs 11 def
+/bfs 7.493857 def
+/cw 4.496314 def
+
+% Dictionary for ISO-8859-1 support
+/iso1dict 8 dict begin
+  /fCourier ISO-8859-1Encoding /Courier reencode_font
+  /fCourier-Bold ISO-8859-1Encoding /Courier-Bold reencode_font
+  /fCourier-BoldOblique ISO-8859-1Encoding /Courier-BoldOblique reencode_font
+  /fCourier-Oblique ISO-8859-1Encoding /Courier-Oblique reencode_font
+  /fHelvetica ISO-8859-1Encoding /Helvetica reencode_font
+  /fHelvetica-Bold ISO-8859-1Encoding /Helvetica-Bold reencode_font
+  /fTimes-Bold ISO-8859-1Encoding /Times-Bold reencode_font
+  /fTimes-Roman ISO-8859-1Encoding /Times-Roman reencode_font
+currentdict end def
+/bgcolor [ 0 0 0 ] def
+/bg false def
+/ul false def
+/bx false def
+% The font for line numbering
+/f# /Helvetica findfont bfs .6 mul scalefont def
+/fSymbol /Symbol findfont def
+/hm fnfs 0.25 mul def
+/pw
+   cw 81.400000 mul
+def
+/ph
+   522.321860 th add
+def
+/pmw urx llx sub pw 2 mul sub 1 div def
+/pmh 0 def
+/v 0 def
+/x [
+  0
+  dup pmw add pw add
+] def
+/y [
+  pmh ph add 0 mul ph add
+  dup
+] def
+/scx sw 2 div def
+/scy sh 2 div def
+/snx urx def
+/sny lly 2 add def
+/dx llx def
+/dy sny def
+/fnx scx def
+/fny dy def
+/lx snx def
+/ly ury fnfs 0.8 mul sub def
+/sx 0 def
+/tab 8 def
+/x0 0 def
+/y0 0 def
+%%EndSetup
+
+%%Page: (1-2) 1
+%%BeginPageSetup
+/pagesave save def
+sh 0 translate 90 rotate
+%%EndPageSetup
+iso1dict begin
+gsave
+llx lly 12 add translate
+/v 0 store
+/x0 x v get 3.147420 add sx cw mul add store
+/y0 y v get bfs th add sub store
+x0 y0 moveto
+(/* ) c n
+(** functions.c) N
+(**) N
+(** Functions for HALOGEN4MUSE) N
+(*/) N
+() p n
+(#include) K
+( <stdio.h>) p n
+(#include) K
+( <math.h>) p n
+(#include) K
+( <string.h>) p n
+(#include) K
+( <stdlib.h>) p n
+(#include) K
+( ") p
+(definitions.h) str
+(") p n
+(#include) K
+( ") p
+(functions.h) str
+(") p n
+() N
+(/*) c n
+(** Functions for integration via Simpson's rule) N
+(** Iteration until precision \(TOL\) is reached ) N
+(*/) N
+() p n
+(DOUBLE integral\(DOUBLE \(*function\)\(DOUBLE,) S
+(const) K
+( SI \(*\)\), DOUBLE a, DOUBLE b, ) p
+(con) K n
+(st) S
+( SI *si\) {) p n
+() N
+(    INT i;) N
+(    DOUBLE T[3], SA, SB;) N
+() N
+(    T[0] = trapez\(function,a,b,0,si\);) N
+(    T[1] = trapez\(function,a,b,1,si\);) N
+(    T[2] = trapez\(function,a,b,2,si\);) N
+(    SA = \(4.0*T[1]-T[0]\)/3.0;) N
+(    SB = \(4.0*T[2]-T[1]\)/3.0;) N
+(    ) S
+(for) K
+(\(i = 3; i < \(NINTMAX+1\); i++\) {) p n
+() S 8 T (T[0] = T[1];) N
+() S 8 T (T[1] = T[2];) N
+() S 8 T (T[2] = trapez\(function,a,b,i,si\);) N
+() S 8 T (SA = SB;) N
+() S 8 T (SB = \(4.0*T[2]-T[1]\)/3.0;) N
+() S 8 T () S
+(if) K
+(\(i > NINTMIN\) {) p n
+() S 8 T (    ) S
+(if) K
+(\(\(fabs\(SB-SA\) < TOL*fabs\(SB\)\) || \(SA == 0.0 && SB == 0.0\)\) {) p n
+() S 8 T () S 16 T () S
+(return) K
+( SB;) p n
+() S 8 T () S 16 T (}) N
+() S 8 T (    }) N
+() S 8 T (}) N
+(    fprintf\(stderr,") S
+(Warning!\\n) str
+("\);) p n
+(    fprintf\(stderr,") S
+(Too many steps in function integral!\\n) str
+("\);) p n
+(    fprintf\(stderr,") S
+(a = ) str
+("OFD3") p
+(\\n) str
+(",a\);) p n
+(    fprintf\(stderr,") S
+(b = ) str
+("OFD3") p
+(\\n) str
+(",b\);) p n
+(    fprintf\(stderr,") S
+(sum = ) str
+("OFD3") p
+(\\n) str
+(",SB\);) p n
+(    fprintf\(stderr,") S
+(Sum not converged within tolerance of %e\\n) str
+(",TOL\);) p n
+(    fprintf\(stderr,") S
+(Abort tolerance was %e\\n) str
+(",fabs\(\(SA-SB\)/SB\)\);) p n
+(    ) S
+(return) K
+( SB;) p n
+(    }) N
+() N
+(DOUBLE trapez\(DOUBLE \(*function\)\(DOUBLE, ) S
+(const) K
+( SI\(*\)\), DOUBLE a, DOUBLE b, INT n) p n
+(, ) S
+(const) K
+( SI *si\) {) p n
+() N
+(    INT i, j, N[n+1];) N
+(    DOUBLE deltax, sum, sumN;) N
+() N
+(    ) S
+(if) K
+( \(n == 0\) {) p n
+() S 8 T () S
+(return) K
+( \(0.5*\(b-a\)*\(\(*function\)\(a,si\)+\(*function\)\(b,si\)\)\);) p n
+() S 8 T (}) N
+(    ) S
+(else) K
+( {) p n
+() S 8 T () S
+(for) K
+( \(i = 0; i < \(n+1\); i++\) {) p n
+() S 8 T (    N[i] = pow\(2,i\);) N
+() S 8 T (    }) N
+() S 8 T (sum = 0.5*\(\(*function\)\(a,si\)+\(*function\)\(b,si\)\);) N
+() S 8 T () S
+(for) K
+(\(i = 1; i < \(n+1\); i++\) {) p n
+() S 8 T (    deltax = \(b-a\)/N[i];) N
+() S 8 T (    sumN = 0;) N
+() S 8 T (    ) S
+(for) K
+( \(j = 1; j < \(N[i-1]+1\); j++\) {) p n
+(functions.c) (Page 1/8) (May 02, 09 6:28) title
+border
+/v 1 store
+/x0 x v get 3.147420 add sx cw mul add store
+/y0 y v get bfs th add sub store
+x0 y0 moveto
+() p 8 T () S 16 T (sumN += \(*function\)\(a+\(2*j-1\)*deltax,si\);) N
+() S 8 T () S 16 T (}) N
+() S 8 T (    sum = sum + sumN;) N
+() S 8 T (    }) N
+() S 8 T () S
+(return) K
+( \(sum*\(b-a\)/N[n]\);) p n
+() S 8 T (}) N
+(    }) N
+() N
+(DOUBLE integraldf\(INT j, ) S
+(const) K
+( GI *gi, ) p
+(const) K
+( SI *si\) {) p n
+(    ) N
+(    INT i;) N
+(    DOUBLE T[3], SA, SB;) N
+() N
+(    T[0] = trapezdf\(j,0,gi,si\);) N
+(    T[1] = trapezdf\(j,1,gi,si\);) N
+(    T[2] = trapezdf\(j,2,gi,si\);) N
+(    SA = \(4.0*T[1]-T[0]\)/3.0;) N
+(    SB = \(4.0*T[2]-T[1]\)/3.0;) N
+(    ) S
+(for) K
+(\(i = 3; i < \(NINTMAXDF+1\); i++\) {) p n
+() S 8 T (T[0] = T[1];) N
+() S 8 T (T[1] = T[2];) N
+() S 8 T (T[2] = trapezdf\(j,i,gi,si\);) N
+() S 8 T (SA = SB;) N
+() S 8 T (SB = \(4.0*T[2]-T[1]\)/3.0;) N
+() S 8 T () S
+(if) K
+(\(i > NINTMINDF\) {) p n
+() S 8 T (    ) S
+(if) K
+(\(\(fabs\(SB-SA\) < TOLDF*fabs\(SB\)\) || \(SA == 0.0 && SB == 0.0\)\) {) p n
+() S 8 T () S 16 T () S
+(return) K
+( SB;) p n
+() S 8 T () S 16 T (}) N
+() S 8 T (    }) N
+() S 8 T (}) N
+(    fprintf\(stderr,") S
+(Warning!\\n) str
+("\);) p n
+(    fprintf\(stderr,") S
+(Too many steps in function integraldf!\\n) str
+("\);) p n
+(    fprintf\(stderr,") S
+(E = ) str
+("OFD3") p
+( kpc^2 Gyr^-2\\n) str
+(",gi->gridr->Pot[j]\);) p n
+(    fprintf\(stderr,") S
+(r = ) str
+("OFD3") p
+( kpc\\n) str
+(",gi->gridr->r[j]\);) p n
+(    fprintf\(stderr,") S
+(f\(E\) = ) str
+("OFD3") p
+( MU Gyr^3 kpc^-6\\n) str
+(",SB\);) p n
+(    fprintf\(stderr,") S
+(f\(E\) not converged within tolerance of %e\\n) str
+(",TOLDF\);) p n
+(    fprintf\(stderr,") S
+(Abort tolerance was %e\\n) str
+(",fabs\(\(SA-SB\)/SB\)\);) p n
+(    ) S
+(if) K
+( \(SB != SB\) {) p n
+() S 8 T (fprintf\(stderr,") S
+(f\(E\) value set to %e MU Gyr^3 kpc^-6\\n) str
+(",DFFAILUREMAX\);) p n
+() S 8 T () S
+(return) K
+( DFFAILUREMAX;) p n
+() S 8 T (}) N
+(    ) S
+(else) K
+( {) p n
+() S 8 T () S
+(return) K
+( SB;) p n
+() S 8 T (}) N
+(    }) N
+() N
+(DOUBLE trapezdf\(INT k, INT n, ) S
+(const) K
+( GI *gi, ) p
+(const) K
+( SI *si\) {) p n
+() N
+(    INT i, j, N[n+1];) N
+(    DOUBLE deltax, sum, sumN;) N
+(    DOUBLE x, xlower, xupper;) N
+(    DOUBLE r, rlower, rupper;) N
+(    DOUBLE Phi, Philower, Phiupper;) N
+(    GRIDR *gridr;) N
+() N
+(    gridr = gi->gridr;) N
+(    Philower = gridr->Pot[NGRIDR-1];) N
+(    Phiupper = gridr->Pot[k];) N
+(    xlower = asin\(sqrt\(Philower/Phiupper\)\);) N
+(    xupper = M_PI/2;) N
+(    rlower = gridr->r[NGRIDR-1];) N
+(    rupper = gridr->r[k];) N
+(    ) S
+(if) K
+( \(n == 0\) {) p n
+() S 8 T () S
+(return) K
+( \(\(sqrt\(-Phiupper/2\)/\(M_PI*M_PI\)\)*0.5*\(xupper-xlower\)*\(d2rhodPhi2\() p n
+(rlower,gi,si\)*sin\(xlower\)+d2rhodPhi2\(rupper,gi,si\)*sin\(xupper\)\)\);) N
+() S 8 T (}) N
+(    ) S
+(else) K
+( {) p n
+() S 8 T () S
+(for) K
+( \(i = 0; i < \(n+1\); i++\) {) p n
+() S 8 T (    N[i] = pow\(2,i\);) N
+(functions.c) (Page 2/8) (May 02, 09 6:28) title
+border
+grestore
+(Printed by drdre) rhead
+(functions.c) (1/4) (Friday November 13, 2009) footer
+end % of iso1dict
+pagesave restore
+showpage
+%%Page: (3-4) 2
+%%BeginPageSetup
+/pagesave save def
+sh 0 translate 90 rotate
+%%EndPageSetup
+iso1dict begin
+gsave
+llx lly 12 add translate
+/v 0 store
+/x0 x v get 3.147420 add sx cw mul add store
+/y0 y v get bfs th add sub store
+x0 y0 moveto
+() p 8 T (    }) N
+() S 8 T (sum = 0.5*\(d2rhodPhi2\(rlower,gi,si\)*sin\(xlower\)+d2rhodPhi2\(rupper,gi,si\)) N
+(*sin\(xupper\)\);) N
+() S 8 T () S
+(for) K
+(\(i = 1; i < \(n+1\); i++\) {) p n
+() S 8 T (    deltax = \(xupper-xlower\)/N[i];) N
+() S 8 T (    sumN = 0;) N
+() S 8 T (    ) S
+(for) K
+( \(j = 1; j < \(N[i-1]+1\); j++\) {) p n
+() S 8 T () S 16 T (x = xlower+\(2*j-1\)*deltax;) N
+() S 8 T () S 16 T (Phi =  Phiupper*sin\(x\)*sin\(x\);) N
+() S 8 T () S 16 T (r = exp\(lininterpolate\(NGRIDR,gridr->logPot,gridr->logr,log\(-Phi) N
+(\)\)\); ) N
+() S 8 T () S 16 T (sumN += d2rhodPhi2\(r,gi,si\)*sin\(x\);) N
+() S 8 T () S 16 T (}) N
+() S 8 T (    sum = sum + sumN;) N
+() S 8 T (    }) N
+() S 8 T () S
+(return) K
+( \(\(sqrt\(-Phiupper/2\)/\(M_PI*M_PI\)\)*sum*\(xupper-xlower\)/N[n]\);) p n
+() S 8 T (}) N
+(    }) N
+() N
+(/*) c n
+(** Function for locating x on a monotonic increasing or decreasing grid ) N
+(*/) N
+() p n
+(INT locate\(INT n, ) S
+(const) K
+( DOUBLE *grid, DOUBLE x\) {) p n
+() N
+(    INT jl, jm, ju, ascend;) N
+() N
+(    jl = -1;) N
+(    ju = n;) N
+(    ascend = \(grid[n-1] >= grid[0]\);) N
+(    ) S
+(while) K
+( \(\(ju-jl\) > 1\) {) p n
+() S 8 T (jm = \(ju+jl\)/2;) N
+() S 8 T () S
+(if) K
+( \(\(x >= grid[jm]\) == ascend\) {) p n
+() S 8 T (    jl = jm;) N
+() S 8 T (    }) N
+() S 8 T () S
+(else) K
+( {) p n
+() S 8 T (    ju = jm;) N
+() S 8 T (    }) N
+() S 8 T (}) N
+(    ) S
+(if) K
+( \(x == grid[0]\) {) p n
+() S 8 T () S
+(return) K
+( 0;) p n
+() S 8 T (}) N
+(    ) S
+(else) K
+( ) p
+(if) K
+( \(x == grid[n-1]\) {) p n
+() S 8 T () S
+(return) K
+( \(n-2\);) p n
+() S 8 T (}) N
+(    ) S
+(else) K
+( {) p n
+() S 8 T () S
+(return) K
+( jl;) p n
+() S 8 T (}) N
+(    }) N
+() N
+(/*) c n
+(** Function for linear interpolation between two grid points ) N
+(*/) N
+() p n
+(DOUBLE lininterpolate\(INT n, ) S
+(const) K
+( DOUBLE *gridx, ) p
+(const) K
+( DOUBLE *gridy, DOUBLE x\)) p n
+( {) N
+() N
+(    INT i; ) N
+(    DOUBLE dgx, dgy, dx, m, y, RE;) N
+() N
+(    i = locate\(n,gridx,x\);) N
+(    ) S
+(if) K
+( \(i < 0\) {) p n
+() S 8 T (fprintf\(stderr,") S
+(Warning!\\n) str
+("\);) p n
+() S 8 T (fprintf\(stderr,") S
+(x = ) str
+("OFD3") p
+( was below range of array! Index i = ) str
+("OFI1") p
+( / n = ) str
+("OFI1") p
+(.\\n) str
+(",x,i) p n
+(,n\);) N
+() S 8 T (fprintf\(stderr,") S
+(Array between ) str
+("OFD3") p
+( and ) str
+("OFD3") p
+(.\\n) str
+(",gridx[0],gridx[n-1]\);) p n
+() S 8 T (RE = fabs\(\(x-gridx[0]\)/gridx[0]\);) N
+() S 8 T () S
+(if) K
+( \(RE < TOLLININT\) {) p n
+() S 8 T (    fprintf\(stderr,") S
+(Relative error \(= ) str
+("OFD1") p
+(\) at lower boundary was within tolerance of %e\\n) str
+(") p n
+(functions.c) (Page 3/8) (May 02, 09 6:28) title
+border
+/v 1 store
+/x0 x v get 3.147420 add sx cw mul add store
+/y0 y v get bfs th add sub store
+x0 y0 moveto
+(,RE,TOLLININT\);) p n
+() S 8 T (    fprintf\(stderr,") S
+(Index set to i = 0\\n) str
+("\);) p n
+() S 8 T (    i = 0;) N
+() S 8 T (    }) N
+() S 8 T (}) N
+(    ) S
+(else) K
+( ) p
+(if) K
+( \(i > n-2\) {) p n
+() S 8 T (fprintf\(stderr,") S
+(Warning!\\n) str
+("\);) p n
+() S 8 T (fprintf\(stderr,") S
+(x = ) str
+("OFD3") p
+( was above range of array! Index i = ) str
+("OFI1") p
+( / n = ) str
+("OFI1") p
+(.\\n) str
+(",x,i) p n
+(,n\);) N
+() S 8 T (fprintf\(stderr,") S
+(Array between ) str
+("OFD3") p
+( and ) str
+("OFD3") p
+(.\\n) str
+(",gridx[0],gridx[n-1]\);) p n
+() S 8 T (RE = fabs\(\(x-gridx[n-1]\)/gridx[n-1]\);) N
+() S 8 T () S
+(if) K
+( \(RE < TOLLININT\) {) p n
+() S 8 T (    fprintf\(stderr,") S
+(Relative error \(= ) str
+("OFD1") p
+(\) at upper boundary was within tolerance of %e\\n) str
+(") p n
+(,RE,TOLLININT\);) N
+() S 8 T (    fprintf\(stderr,") S
+(Index set to i = n-2 = ) str
+("OFI1") p
+(\\n) str
+(",n-2\);) p n
+() S 8 T (    i = n-2;) N
+() S 8 T (    }) N
+() S 8 T (}) N
+(    dgy = gridy[i+1] - gridy[i];) N
+(    dgx = gridx[i+1] - gridx[i];) N
+(    m = dgy/dgx;) N
+(    dx = x - gridx[i];) N
+(    y = gridy[i] + dx*m;) N
+() N
+(    ) S
+(return) K
+( y;) p n
+(    }) N
+() N
+(/*) c n
+(** Function for generating random numbers between [0,1] ) N
+(*/) N
+() p n
+(DOUBLE rand01\(\) {) N
+() N
+(    ) S
+(return) K
+( \( \(\(DOUBLE\) rand\(\)\) / \(\(DOUBLE\) RAND_MAX\) \);) p n
+(    }) N
+() N
+(/* ) c n
+(** alpha-beta-gamma density function with exponential cutoff ) N
+(** except for finite mass models ) N
+(*/) N
+() p n
+(DOUBLE rho\(DOUBLE r, ) S
+(const) K
+( SI *si\) {) p n
+() N
+(    DOUBLE fac1, fac2;) N
+(    SP *sp;) N
+() N
+(    sp = si->sp;) N
+(    ) S
+(if) K
+( \(sp->beta > 3\) {) p n
+() S 8 T () S
+(/*) c n
+() S 8 T (** Finite mass models) N
+() S 8 T (*/) N
+() p 8 T () S
+(return) K
+( \(sp->rho0/tau\(r,si\)\);) p n
+() S 8 T (}) N
+(    ) S
+(else) K
+( {) p n
+() S 8 T () S
+(/*) c n
+() S 8 T (** Cutoff models) N
+() S 8 T (*/) N
+() p 8 T () S
+(if) K
+( \(r <= sp->rcutoff\) {) p n
+() S 8 T (    ) S
+(return) K
+( \(sp->rho0/tau\(r,si\)\);) p n
+() S 8 T (    }) N
+() S 8 T () S
+(else) K
+( {) p n
+() S 8 T (    fac1 = pow\(\(r/sp->rcutoff\),sp->delta\);) N
+() S 8 T (    fac2 = exp\(-\(r-sp->rcutoff\)/sp->rdecay\);) N
+() S 8 T (    ) S
+(return) K
+( \(sp->rho0/tau\(sp->rcutoff,si\)*fac1*fac2\);) p n
+() S 8 T (    }) N
+() S 8 T (}) N
+(    }) N
+() N
+(/* ) c n
+(functions.c) (Page 4/8) (May 02, 09 6:28) title
+border
+grestore
+(Printed by drdre) rhead
+(functions.c) (2/4) (Friday November 13, 2009) footer
+end % of iso1dict
+pagesave restore
+showpage
+%%Page: (5-6) 3
+%%BeginPageSetup
+/pagesave save def
+sh 0 translate 90 rotate
+%%EndPageSetup
+iso1dict begin
+gsave
+llx lly 12 add translate
+/v 0 store
+/x0 x v get 3.147420 add sx cw mul add store
+/y0 y v get bfs th add sub store
+x0 y0 moveto
+(** Derivative of density drho/dr ) c n
+(*/) N
+() p n
+(DOUBLE drhodr\(DOUBLE r, ) S
+(const) K
+( SI *si\) {) p n
+() N
+(    SP *sp;) N
+() N
+(    sp = si->sp;) N
+(    ) S
+(if) K
+( \(sp->beta > 3\) {) p n
+() S 8 T () S
+(/*) c n
+() S 8 T (** Finite mass models) N
+() S 8 T (*/) N
+() p 8 T () S
+(return) K
+( \(-rho\(r,si\)*eta\(r,si\)\);) p n
+() S 8 T (}) N
+(    ) S
+(else) K
+( {) p n
+() S 8 T () S
+(/*) c n
+() S 8 T (** Cutoff models) N
+() S 8 T (*/) N
+() p 8 T () S
+(if) K
+( \(r <= sp->rcutoff\) {) p n
+() S 8 T (    ) S
+(return) K
+( \(-rho\(r,si\)*eta\(r,si\)\);) p n
+() S 8 T (    }) N
+() S 8 T () S
+(else) K
+( {) p n
+() S 8 T (    ) S
+(return) K
+( \(rho\(r,si\)*\(sp->delta/r-1/sp->rdecay\)\);) p n
+() S 8 T (    }) N
+() S 8 T (}) N
+(    }) N
+() N
+(/* ) c n
+(** Derivative of density d^2rho/dr^2 ) N
+(*/) N
+() p n
+(DOUBLE d2rhodr2\(DOUBLE r, ) S
+(const) K
+( SI *si\) {) p n
+() N
+(    SP *sp;) N
+() N
+(    sp = si->sp;) N
+(    ) S
+(if) K
+( \(sp->beta > 3\) {) p n
+() S 8 T () S
+(/*) c n
+() S 8 T (** Finite mass models) N
+() S 8 T (*/) N
+() p 8 T () S
+(return) K
+( \(rho\(r,si\)*\(pow\(eta\(r,si\),2\)-detadr\(r,si\)\)\);) p n
+() S 8 T (}) N
+(    ) S
+(else) K
+( {) p n
+() S 8 T () S
+(/*) c n
+() S 8 T (** Cutoff models) N
+() S 8 T (*/) N
+() p 8 T () S
+(if) K
+( \(r <= sp->rcutoff\) {) p n
+() S 8 T (    ) S
+(return) K
+( \(rho\(r,si\)*\(pow\(eta\(r,si\),2\)-detadr\(r,si\)\)\);) p n
+() S 8 T (    }) N
+() S 8 T () S
+(else) K
+( {) p n
+() S 8 T (    ) S
+(return) K
+( \(rho\(r,si\)*\(pow\(\(sp->delta/r-1/sp->rdecay\),2\)-sp->delta/\(r*r\)) p n
+(\)\);) N
+() S 8 T (    }) N
+() S 8 T (}) N
+(    }) N
+() N
+(/* ) c n
+(** Derivative of density d^2rho/dPhi^2 ) N
+(*/) N
+() p n
+(DOUBLE d2rhodPhi2\(DOUBLE r, ) S
+(const) K
+( GI *gi, ) p
+(const) K
+( SI *si\) {) p n
+() N
+(    DOUBLE Mencr;) N
+(    DOUBLE fac1, fac2;) N
+(    SP *sp;) N
+() N
+(    sp = si->sp;) N
+(    Mencr = Menc\(r,gi\);) N
+(    fac1 = r*r/\(G*G*Mencr*Mencr\);) N
+(functions.c) (Page 5/8) (May 02, 09 6:28) title
+border
+/v 1 store
+/x0 x v get 3.147420 add sx cw mul add store
+/y0 y v get bfs th add sub store
+x0 y0 moveto
+(    fac2 = 2*r-4*M_PI*r*r*r*r*rho\(r,si\)/Mencr;) p n
+(    ) S
+(return) K
+( \(fac1*\(r*r*d2rhodr2\(r,si\)+fac2*drhodr\(r,si\)\)\);) p n
+(    }) N
+() N
+(/* ) c n
+(** Derivative of density dlrho/dlr ) N
+(*/) N
+() p n
+(DOUBLE dlrhodlr\(DOUBLE r, ) S
+(const) K
+( SI *si\) {) p n
+() N
+(    ) S
+(return) K
+( \(r/rho\(r,si\)*drhodr\(r,si\)\);) p n
+(    }) N
+() N
+(/*) c n
+(** Auxiliary functions ) N
+(*/) N
+() p n
+(DOUBLE eta\(DOUBLE r, ) S
+(const) K
+( SI *si\) {) p n
+() N
+(    DOUBLE fac1, fac2, fac3;) N
+(    SP *sp;) N
+() N
+(    sp = si->sp;) N
+(    fac1 = \(sp->beta-sp->gamma\)/sp->rs;) N
+(    fac2 = pow\(\(r/sp->rs\),\(sp->alpha-1\)\);) N
+(    fac3 = 1+pow\(\(r/sp->rs\),sp->alpha\);) N
+(    ) S
+(return) K
+( \(\(sp->gamma/r\)+\(fac1*fac2/fac3\)\);) p n
+(    }) N
+() N
+(DOUBLE detadr\(DOUBLE r, ) S
+(const) K
+( SI *si\) {) p n
+() N
+(    DOUBLE fac1, fac2, fac3, fac4;) N
+(    SP *sp;) N
+() N
+(    sp = si->sp;) N
+(    fac1 = \(sp->beta-sp->gamma\)/\(sp->rs*sp->rs\);) N
+(    fac2 = pow\(\(r/sp->rs\),\(sp->alpha-2\)\);) N
+(    fac3 = \(sp->alpha-1\)*\(1+pow\(\(r/sp->rs\),sp->alpha\)\)-sp->alpha*pow\(\(r/sp->rs\),) N
+(sp->alpha\);) N
+(    fac4 = pow\(\(1+pow\(\(r/sp->rs\),sp->alpha\)\),2\);) N
+(    ) S
+(return) K
+( \(-sp->gamma/\(r*r\)+fac1*fac2*fac3/fac4\);) p n
+(    }) N
+() N
+(DOUBLE tau\(DOUBLE r, ) S
+(const) K
+( SI *si\) {) p n
+(    ) N
+(    DOUBLE exp1, exp2, exp3;) N
+(    DOUBLE fac1, fac2, fac3;) N
+(    SP *sp;) N
+() N
+(    sp = si->sp;) N
+(    exp1 = sp->gamma;) N
+(    exp2 = sp->alpha;) N
+(    exp3 = \(sp->beta-sp->gamma\)/sp->alpha;) N
+(    fac1 = pow\(r/sp->rs,exp1\);) N
+(    fac2 = 1+pow\(r/sp->rs,exp2\);) N
+(    fac3 = pow\(fac2,exp3\);) N
+(    ) S
+(return) K
+( \(fac1*fac3\);) p n
+(    }) N
+() N
+(/*) c n
+(** Integrand of IM integral ) N
+(*/) N
+() p n
+(DOUBLE integrandIM\(DOUBLE r, ) S
+(const) K
+( SI *si\) {) p n
+(    ) N
+(    DOUBLE exp1, exp2, exp3;) N
+(    DOUBLE fac1, fac2, fac3;) N
+(    SP *sp;) N
+() N
+(functions.c) (Page 6/8) (May 02, 09 6:28) title
+border
+grestore
+(Printed by drdre) rhead
+(functions.c) (3/4) (Friday November 13, 2009) footer
+end % of iso1dict
+pagesave restore
+showpage
+%%Page: (7-8) 4
+%%BeginPageSetup
+/pagesave save def
+sh 0 translate 90 rotate
+%%EndPageSetup
+iso1dict begin
+gsave
+llx lly 12 add translate
+/v 0 store
+/x0 x v get 3.147420 add sx cw mul add store
+/y0 y v get bfs th add sub store
+x0 y0 moveto
+(    sp = si->sp;) p n
+(    exp1 = 2-sp->gamma;) N
+(    exp2 = sp->alpha;) N
+(    exp3 = \(sp->beta-sp->gamma\)/sp->alpha;) N
+(    fac1 = pow\(r,exp1\);) N
+(    fac2 = 1+pow\(r,exp2\);) N
+(    fac3 = pow\(fac2,exp3\);) N
+(    ) S
+(return) K
+( \(fac1/fac3\);) p n
+(    }) N
+() N
+(/*) c n
+(** Integrand of IMcutoff integral) N
+(*/) N
+() p n
+(DOUBLE integrandIMcutoff\(DOUBLE r, ) S
+(const) K
+( SI *si\) {) p n
+() N
+(    DOUBLE fac1, fac2, fac3;) N
+(    SP *sp;) N
+() N
+(    sp = si->sp;) N
+(    fac1 = r*r;) N
+(    fac2 = pow\(r/sp->rcutoff,sp->delta\);) N
+(    fac3 = exp\(-\(r-sp->rcutoff\)/sp->rdecay\);) N
+(    ) S
+(return) K
+( \(fac1*fac2*fac3\);) p n
+(    }) N
+() N
+(/*) c n
+(** Integrand of enclosed mass integral ) N
+(*/) N
+() p n
+(DOUBLE integrandMenc\(DOUBLE r, ) S
+(const) K
+( SI *si\) {) p n
+() N
+(    ) S
+(return) K
+( \(4*M_PI*r*r*\(rho\(r,si\)\)\);) p n
+(    }) N
+() N
+(/*) c n
+(** Integrand of outer potential integral ) N
+(*/) N
+() p n
+(DOUBLE integrandPot\(DOUBLE r, ) S
+(const) K
+( SI *si\) {) p n
+() N
+(    ) S
+(return) K
+( \(4*M_PI*r*\(rho\(r,si\)\)\);) p n
+(    }) N
+() N
+(/* ) c n
+(** Function for calculating total enclosed mass within radius r ) N
+(*/) N
+() p n
+(DOUBLE Menc\(DOUBLE r, ) S
+(const) K
+( GI *gi\) {) p n
+() N
+(    ) S
+(return) K
+( \(exp\(lininterpolate\(NGRIDR,gi->gridr->logr,gi->gridr->logMenc,log\(r\)\)) p n
+(\)\);) N
+(    }) N
+() N
+(/*) c n
+(** Function for calculating potential at radius r ) N
+(*/) N
+() p n
+(DOUBLE Pot\(DOUBLE r, ) S
+(const) K
+( GI *gi\) {) p n
+() N
+(    ) S
+(return) K
+( \(-exp\(lininterpolate\(NGRIDR,gi->gridr->logr,gi->gridr->logPot,log\(r\)\)) p n
+(\)\);) N
+(    }) N
+() N
+(/*) c n
+(** Function for calculating the escape velocity at position r ) N
+(*/) N
+() p n
+(DOUBLE vescape\(DOUBLE r, ) S
+(const) K
+( GI *gi\) {) p n
+(functions.c) (Page 7/8) (May 02, 09 6:28) title
+border
+/v 1 store
+/x0 x v get 3.147420 add sx cw mul add store
+/y0 y v get bfs th add sub store
+x0 y0 moveto
+() p n
+(    ) S
+(return) K
+( \(sqrt\(2.0*fabs\(Pot\(r,gi\)-gi->gridr->Pot[NGRIDR-1]\)\)\);) p n
+(    }) N
+() N
+(/*) c n
+(** Function for calculating the dynamical time at position r ) N
+(*/) N
+() p n
+(DOUBLE Tdyn\(DOUBLE r, ) S
+(const) K
+( GI *gi\) {) p n
+() N
+(    ) S
+(return) K
+( \(2*M_PI*sqrt\(\(r*r*r\)/\(G*Menc\(r,gi\)\)\)\);) p n
+(    }) N
+() N
+(/*) c n
+(** Function for calculating the value of the distribution function at energy E ) N
+(*/) N
+() p n
+(DOUBLE f1\(DOUBLE E, ) S
+(const) K
+( SI *si\) {) p n
+() N
+(    ) S
+(return) K
+( \(exp\(lininterpolate\(NGRIDDF,si->griddf->logE,si->griddf->logfE,log\(-E) p n
+(\)\)\)\);) N
+(    }) N
+() N
+(/*) c n
+(** Function for calculating the value of the distribution function at position r) N
+( ) N
+(*/) N
+() p n
+(DOUBLE f2\(DOUBLE r, ) S
+(const) K
+( SI *si\) {) p n
+() N
+(    ) S
+(return) K
+( \(exp\(lininterpolate\(NGRIDDF,si->griddf->logr,si->griddf->logfE,log\(r\)) p n
+(\)\)\);) N
+(    }) N
+(functions.c) (Page 8/8) (May 02, 09 6:28) title
+border
+grestore
+(Printed by drdre) rhead
+(functions.c) (4/4) (Friday November 13, 2009) footer
+end % of iso1dict
+pagesave restore
+showpage
+
+%%Trailer
+end
+%%EOF

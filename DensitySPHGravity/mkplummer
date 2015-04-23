@@ -1,0 +1,5 @@
+#!/bin/bash
+
+./H4P/halogen4muse -a 2 -b 5 -c 0 -M 1 -rs 1 -N $1 -name out
+mv out.IC.ascii plummer$1
+rm out.out

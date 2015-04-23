@@ -1,0 +1,54 @@
+HALOGEN4MUSE by Marcel Zemp / Version 30. August 2007
+
+Command line
+
+./halogen4muse -a 2 -b 5 -c 0 -M 1 -rs 1 -N 100000 -name plummer 
+
+Model properties
+
+alpha = 2
+beta  = 5
+gamma = 0
+rho0  = 2.3873241e-01 MU LU^-3
+
+rs      = 1.0000000e+00 LU
+rhalf   = 1.3047672e+00 LU
+rvir    = 1.6957344e+00 LU
+rinner  = 1.0000000e-06 LU
+router  = 1.0000000e+05 LU
+
+M(rs)      = 3.5354988e-01 MU
+M(rhalf)   = 4.9999612e-01 MU
+M(rvir)    = 6.3910146e-01 MU
+M(rinner)  = 1.0000000e-18 MU
+M(router)  = 1.0000000e+00 MU
+
+Sampling properties
+
+|Cr| = 3.5402101e-17 MU       Cr = (+3.1494698e-17, +1.6031920e-17, +2.0905145e-18) MU
+|Cv| = 1.1564880e-17 MU TU^-1 Cv = (+1.1246746e-17, -1.6941991e-18, +2.0944768e-18) MU TU^-1
+
+Etot = -1.4708513e-01 MU LU^2 TU^-2
+Ekin = +1.4777237e-01 MU LU^2 TU^-2
+Epot = -2.9485750e-01 MU LU^2 TU^-2
+Rvir = |2*Ekin/Epot| = 1.00233
+
+Ntot                = 1.0000000e+05 = 100000
+rimp                = 2.5062527e-02 LU
+r1                  = 2.1544347e-02 LU
+r100                = 1.0000000e-01 LU
+Mtheo               = 1.0000000e+00 MU
+Msamp               = 1.0000000e+00 MU
+(Msamp-Mtheo)/Mtheo = -1.9162449e-12
+Random seed         = 1.4291251e+09
+
+Times for individual steps
+
+Calculation of halo properties and initialisation of grid in r: 0.067892 seconds.
+Initialisation of grid for distribution function: 0.085165 seconds.
+Setting particle positions: 0.023408 seconds
+Setting particle velocities: 0.138394 seconds
+Setting remaining particle attributes: 0.00025 seconds
+Calculating a few things and correct center of mass: 0.018059 seconds
+Writing output: 0.305497 seconds
+Total time: 0.638665 seconds
